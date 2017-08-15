@@ -399,6 +399,7 @@ public class ModelReductionEditor : EditorWindow {
         if (GUILayout.Button("Reduction"))
         {
             Reduce();
+            Debug.Log("Reduced!");
         }
         EditorGUILayout.Separator();
         if (GUILayout.Button("Save Model"))
