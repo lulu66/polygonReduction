@@ -1,4 +1,4 @@
 sceneSetups:
-- path: Assets/modelReduct.unity
+- path: Assets/ModelReduction/modelReduct.unity
   isLoaded: 1
   isActive: 1
