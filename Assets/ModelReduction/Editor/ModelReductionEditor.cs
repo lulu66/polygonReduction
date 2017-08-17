@@ -15,14 +15,16 @@ public class ModelReductionEditor : EditorWindow {
     int vertNumGUI = 0;
     int vertNumGUIBefore = 0;
     ModelStreams modelStream;
+    //used by .obj
     GameObject root;
     Mesh rootMeshes;
+    //used by .stl
     GameObject[] temp;
     Mesh[] tempMeshes;
     Options op;
     int perSubModelTriNum = 20000;
-    int totalTriNum;
-    int count = 0;//表示有多少个子模型
+    int totalTriNum = 0;
+    int count = 0;//subMesh count
 
     #region 关于消减
     private Vector3[] vertices;
@@ -30,8 +32,8 @@ public class ModelReductionEditor : EditorWindow {
     private int[] triangles;
     private PRVertex[] prVertices;
     private PRTriangle[] prTriangles;
-    private int reduceTriNum = 1000;
     private List<ReductionData> reductionData = new List<ReductionData>();
+    bool initReduction = false;
     #endregion
 
     [MenuItem("Model/Analyse")]
@@ -46,7 +48,9 @@ public class ModelReductionEditor : EditorWindow {
     {
         string fileType = "";
         if(op == Options.obj)
+        {
             fileType = "obj";
+        }
         else if(op == Options.stl)
         {
             fileType = "stl";
@@ -56,7 +60,9 @@ public class ModelReductionEditor : EditorWindow {
             return;
         FileStream fs = File.OpenRead(strModelPath);
         if (modelStream == null)
+        {
             modelStream = new ModelStreams();
+        }
         modelStream.Load(fs, strModelPath);
         fs.Close();
 
@@ -66,8 +72,6 @@ public class ModelReductionEditor : EditorWindow {
     #region 执行消减算法
     void ReduceInit()
     {
-        if (modelStream._suffix == "obj")
-            rootMeshes = Object.Instantiate<Mesh>(rootMeshes);
         vertices = modelStream.VerticeAfterCompList.ToArray();
         normals = modelStream.NormalAfterCompList.ToArray() ;
         if(normals.Length == 0)
@@ -112,20 +116,27 @@ public class ModelReductionEditor : EditorWindow {
         {
             ComputeCostPerVertex(prVertices[i]);
         }
+        initReduction = true;
     }
 
     void Reduce()
-    {
-        
+    {        
+        if(initReduction == false)
+        {
+            Debug.Log("还没初始化哦~~");
+            return;
+        }
         if (reductionData != null)
         {
             reductionData.Clear();
         }
-        reduceTriNum = vertNumGUIBefore - vertNumGUI;
-        Debug.Log("reduceTriNum:" + reduceTriNum);
-        //执行坍塌算法的次数,根据滑动条上三角片的个数
-        for (int i = 0; i < reduceTriNum; i++)
+        int reduceVertNum = vertNumGUIBefore - vertNumGUI;
+        Debug.Log("模型顶点数减少了 " + reduceVertNum + " 个.");
+
+        //执行坍塌算法的次数
+        for (int i = 0; i < reduceVertNum; i++)
         {
+            EditorUtility.DisplayProgressBar("减面", "正在减面......", (float)i / reduceVertNum);
             PRVertex min = MinCostVertex();
             Collapse(min, min.collapse);
         }
@@ -135,19 +146,18 @@ public class ModelReductionEditor : EditorWindow {
             ApplyData(reductionData[i]);
         }
 
-        //ApplyNormals();
+        EditorUtility.ClearProgressBar();
 
         if (modelStream._suffix == "obj")
         {
             rootMeshes.vertices = vertices;
-            //rootMeshes.normals = normals;
             rootMeshes.triangles = triangles;
-            //rootMeshes.RecalculateNormals();
             root.GetComponent<MeshFilter>().mesh = rootMeshes;
         }
-        else if(modelStream._suffix == "stl")
+
+        #region STL File
+        else if (modelStream._suffix == "stl")
         {
-            #region STL File
             for (int i = 0; i < count; i++)
             {            
                 int startIndex = modelStream.SubIndexList[i * 3 + 0];
@@ -177,35 +187,15 @@ public class ModelReductionEditor : EditorWindow {
                 }
 
                 tempMeshes[i].vertices = tmpVertices;
-                //tempMeshes[i].normals = tmpNormals;
                 tempMeshes[i].triangles = tmpTriangles;
-                //tempMeshes[i].RecalculateNormals();
                 temp[i].GetComponent<MeshFilter>().mesh = tempMeshes[i];
 
             }
-            #endregion
         }
+        #endregion
 
         vertNumGUIBefore = vertNumGUI;
     }
-
-    //void ApplyNormals()
-    //{
-    //    for(int i = 0; i < prVertices.Length; i++)
-    //    {
-    //        Vector3 tempNormal = Vector3.zero;
-    //        if(prVertices[i].cost < 100000f)
-    //        {
-    //            int triNum = prVertices[i].face.Count;
-    //            for (int j = 0; j < triNum; j++)
-    //            {
-    //                tempNormal += prVertices[i].face[j].normal;
-    //            }
-    //            tempNormal /= triNum;
-    //            normals[i] = tempNormal.normalized;
-    //        }
-    //    }
-    //}
 
     void ApplyData(ReductionData rd)
     {
@@ -335,14 +325,13 @@ public class ModelReductionEditor : EditorWindow {
     {
         if (modelStream.VerticeList != null || modelStream.VerticeAfterCompList != null)
         {
-            #region 采用GameObject的方式绘制模型
             root = new GameObject("model");
             root.transform.localPosition = Vector3.zero;
             root.transform.localScale = Vector3.one;
 
+            #region STL File
             if (modelStream._suffix == "stl")
             {
-                #region STL File
                 count = totalTriNum / perSubModelTriNum;
                 count += (totalTriNum % perSubModelTriNum > 0) ? 1 : 0;
 
@@ -373,17 +362,16 @@ public class ModelReductionEditor : EditorWindow {
                     tempMeshes[i] = new Mesh();
                     tempMeshes[i].name = temp[i].name;
                     tempMeshes[i].vertices = vertsList.ToArray();
-                    //tempMeshes[i].normals = norList.ToArray();
+                    tempMeshes[i].normals = norList.ToArray();
                     tempMeshes[i].triangles = triangleIndexs.ToArray();
-                    tempMeshes[i].RecalculateNormals();
                     mf.mesh = tempMeshes[i];
-                    //mr.material = new Material(Shader.Find("Unlit/WireFrameSingle2"));
                     mr.material = new Material(Shader.Find("Standard"));
-
-                    #endregion
                 }
             }
-            else if(modelStream._suffix == "obj")
+            #endregion
+
+            #region OBJ File
+            else if (modelStream._suffix == "obj")
             {
                 MeshFilter mf = root.AddComponent<MeshFilter>();
                 MeshRenderer mr = root.AddComponent<MeshRenderer>();
@@ -391,16 +379,15 @@ public class ModelReductionEditor : EditorWindow {
                 rootMeshes = new Mesh();
                 rootMeshes.name = root.name;
                 rootMeshes.vertices = modelStream.VerticeAfterCompList.ToArray();
-                //rootMeshes.normals = modelStream.NormalAfterCompList.ToArray();
+                rootMeshes.normals = modelStream.NormalAfterCompList.ToArray();
                 rootMeshes.triangles = modelStream.TriangleAfterCompList.ToArray();
-                rootMeshes.RecalculateNormals();
                 mf.mesh = rootMeshes;
-                //mr.material = new Material(Shader.Find("Unlit/WireFrameSingle2"));
                 mr.material = new Material(Shader.Find("Standard"));
             }
+            #endregion
+
             vertNumGUI = modelStream.VerticeAfterCompList.Count;
             vertNumGUIBefore = vertNumGUI;
-            #endregion
         }
     }
         
@@ -408,37 +395,38 @@ public class ModelReductionEditor : EditorWindow {
     {
         GUILayout.BeginVertical();
 
-        op = (Options)EditorGUILayout.EnumPopup("select file type:", op);
+        op = (Options)EditorGUILayout.EnumPopup("选择文件类型:", op);
 
         GUILayout.Label("Load Model", EditorStyles.boldLabel);
-        if (GUILayout.Button("Load"))
+
+        if (GUILayout.Button("选择模型文件"))
         {
             LoadModel();
             DrawInitModel();
         }
         EditorGUILayout.Separator();
 
-        if(GUILayout.Button("Init Reduction"))
+        if(GUILayout.Button("初始化"))
         {
             ReduceInit();
-            Debug.Log("Init Complete!");
+            Debug.Log("初始化完成!");
         }
 
-        GUILayout.Label("Vertex Num", EditorStyles.boldLabel);
+        GUILayout.Label("顶点数", EditorStyles.boldLabel);
 
         vertNumGUI = EditorGUILayout.IntSlider(vertNumGUI, 0, 100000);
 
-        if (GUILayout.Button("Reduction"))
+        if (GUILayout.Button("开始减面"))
         {
             Reduce();
         }
         EditorGUILayout.Separator();
-        if (GUILayout.Button("Save Model"))
+        if (GUILayout.Button("存储简化模型"))
         {
             SaveModel();
         }
         EditorGUILayout.Separator();
-        if (GUILayout.Button("Clear"))
+        if (GUILayout.Button("清理"))
         {
             ClearGameObjects();
             modelStream.Clear();
@@ -446,16 +434,51 @@ public class ModelReductionEditor : EditorWindow {
         GUILayout.EndVertical();
     }
 
-    void SaveModel()
+    void SaveModel()//均存储为.obj文件
     {
         if (vertices.Length == 0 || normals.Length == 0 || triangles.Length == 0)
         {
             Debug.Log("vertice | normals | triangles length is zero.");
             return;
         }
-        modelStream.FinalVerticeList = new List<Vector3>(vertices);
-        modelStream.FinalNormalList = new List<Vector3>(normals);
-        modelStream.FinalTriangleList = new List<int>(triangles);
+        modelStream.FinalVerticeList = new List<Vector3>();
+        modelStream.FinalNormalList = new List<Vector3>();
+        modelStream.FinalTriangleList = new List<int>();
+
+            //find useful indexes
+            for(int i = 0; i < triangles.Length; i += 3)
+            {
+                if(triangles[i] != 0 || triangles[i+1] != 0 || triangles[i+2] != 0)
+                {
+                    modelStream.FinalTriangleList.Add(triangles[i]);
+                    modelStream.FinalTriangleList.Add(triangles[i+1]);
+                    modelStream.FinalTriangleList.Add(triangles[i+2]);
+                }
+            }
+
+            for(int i = 0; i < modelStream.FinalTriangleList.Count; i++)
+            {
+                EditorUtility.DisplayProgressBar("存储", "正在存储模型......", (float)i / modelStream.FinalTriangleList.Count);
+                int index = modelStream.FinalTriangleList[i];
+                Vector3 vert = vertices[index];
+                bool bContain = false;
+                for(int j = 0; j < modelStream.FinalVerticeList.Count; j++)
+                {
+                    if (vert.Equals(modelStream.FinalVerticeList[j]))
+                    {
+                        modelStream.FinalTriangleList[i] = j;
+                        bContain = true;
+                        break;
+                    }
+                }
+                if(bContain == false)
+                {
+                    modelStream.FinalVerticeList.Add(vertices[index]); 
+                    modelStream.FinalNormalList.Add(normals[index]);
+                    modelStream.FinalTriangleList[i] = modelStream.FinalVerticeList.Count - 1;
+                }
+            }
+            EditorUtility.ClearProgressBar();
 
         string modelPath = Path.Combine(Application.streamingAssetsPath, "ReductionModel");
         if (!Directory.Exists(modelPath))
@@ -469,7 +492,7 @@ public class ModelReductionEditor : EditorWindow {
         FileStream fs = File.Create(modelName);
         modelStream.Save(fs);
         fs.Close();
-        Debug.Log("Save Sucessfully!");
+        Debug.Log("存储完成!");
     }
 
     void ClearGameObjects()
@@ -486,19 +509,4 @@ public class ModelReductionEditor : EditorWindow {
         root = null;
     }
 
-    void OnSceneGUI(SceneView sceneView)
-    {
-    }
-
-    private void OnFocus()
-    {
-        SceneView.onSceneGUIDelegate -= this.OnSceneGUI;
-        SceneView.onSceneGUIDelegate += this.OnSceneGUI;
-
-    }
-
-    private void OnDestroy()
-    {
-        SceneView.onSceneGUIDelegate -= this.OnSceneGUI;
-    }
 }

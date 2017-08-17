@@ -10,25 +10,25 @@ public class ModelStreams
 {
 
     public List<Triangle> triList;
-
+    //只针对stl文件，压缩前的顶点、法线和纹理
     public List<Vector3> VerticeList;
     public List<Vector3> NormalList;
     public List<int> TriangleList;
-
+    //压缩后，顶点唯一
     public List<Vector3> VerticeAfterCompList;
     public List<Vector3> NormalAfterCompList;
     public List<int> TriangleAfterCompList;
-    public List<int> SubIndexList;
-
+    public List<int> SubIndexList;//存放顶点列表每个subMesh的起始索引，顶点个数、索引个数
+    //用于存储的顶点、法线和纹理
     public List<Vector3> FinalVerticeList;
     public List<Vector3> FinalNormalList;
     public List<int> FinalTriangleList;
 
-    public int _totalTriNum = 0;
-    public int _number = 0;
-    public string _suffix;
+    public int _totalTriNum = 0;//总的三角形个数
+    public string _suffix;//后缀
     private int startIndex = 0;
 
+    //解析AscII格式的stl文件
     private void LoadASCIIModelFile(Stream stream)
     {
         triList = new List<Triangle>();
@@ -84,7 +84,8 @@ public class ModelStreams
         }
     }
 
-    private void LoadBinaryModelFile(Stream stream)
+    //解析二进制格式的stl文件
+    private void LoadBinarySTLModelFile(Stream stream)
     {
         VerticeList = new List<Vector3>();
         NormalList = new List<Vector3>();
@@ -102,15 +103,15 @@ public class ModelStreams
 
             if (reader.BaseStream.Length != _totalTriNum * 50 + 84)
                 throw new Exception("STL文件长度无效");
-
-            while (_number < _totalTriNum)
+            int number = 0;
+            while (number < _totalTriNum)
             {
                 byte[] bytes;
                 bytes = reader.ReadBytes(50);
 
                 if (bytes.Length < 50)
                 {
-                    _number += 1;
+                    number += 1;
                     continue;
                 }
 
@@ -134,7 +135,7 @@ public class ModelStreams
                 TriangleList.Add(indexV2);
                 TriangleList.Add(indexV3);
 
-                _number += 1;
+                number += 1;
             }
         }
     }
@@ -172,7 +173,6 @@ public class ModelStreams
             vertices.RemoveAt(removes[i]);
             normals.RemoveAt(removes[i]);
         }
-
         List<int> tempTriList = new List<int>();
         for (int i = 0; i < triangleIndexs.Count; i++)
         {
@@ -185,9 +185,7 @@ public class ModelStreams
         SubIndexList.Add(startIndex);
         SubIndexList.Add(vertices.Count);
         SubIndexList.Add(triangleIndexs.Count);
-
         startIndex = VerticeAfterCompList.Count;
-
         EditorUtility.ClearProgressBar();
     }
 
@@ -208,8 +206,7 @@ public class ModelStreams
         TriangleAfterCompList = new List<int>();
 
         using (StreamReader file = new StreamReader(stream))
-        {
-            _totalTriNum = 0;
+        { 
             string line = "";
             while(file.Peek() != -1)
             {
@@ -234,14 +231,14 @@ public class ModelStreams
     }
 
     public bool Load(Stream stream, string path)
-    {
-        _totalTriNum = 0;//三角形面片的数量
+    { 
         _suffix = GetSuffix(path);
-        if (File.Exists(path))//如果文件存在，则进行读取
+
+        if (File.Exists(path))
         {
             if(_suffix == "stl")
             {
-                LoadBinaryModelFile(stream);
+                LoadBinarySTLModelFile(stream);
                 return true;
             }
             if(_suffix == "obj")
@@ -255,20 +252,30 @@ public class ModelStreams
 
     public void Save(Stream stream)
     {
+        StringBuilder sb = new StringBuilder();
+
+        sb.Append("# reductedModel.obj file\n");
+        foreach(Vector3 vec in FinalVerticeList)
+        {
+            sb.Append(string.Format("v {0} {1} {2}\n", vec.x, vec.y, vec.z));
+        }
+        sb.Append("\n");
+
+        foreach (Vector3 vec in FinalNormalList)
+        {
+            sb.Append(string.Format("vn {0} {1} {2}\n", vec.x, vec.y, vec.z));
+        }
+        sb.Append("\n");
+
+        for(int i = 0; i < FinalTriangleList.Count; i += 3)
+        {
+            sb.Append(string.Format("f {0}/{0}/{0} {1}/{1}/{1} {2}/{2}/{2}\n", FinalTriangleList[i] + 1, 
+                FinalTriangleList[i+1] + 1, FinalTriangleList[i+2] + 1));
+        }
+        string contents = sb.ToString();
         using (StreamWriter file = new StreamWriter(stream))
         {
-            for(int i = 0; i < FinalVerticeList.Count; i++)
-            {
-                file.Write("v  " + FinalVerticeList[i].x + " " + FinalVerticeList[i].y + " " + FinalVerticeList[i].z +  "\n");
-            }
-            for (int i = 0; i < FinalNormalList.Count; i++)
-            {
-                file.Write("vn  " + FinalNormalList[i].x + " " + FinalNormalList[i].y + " " + FinalNormalList[i].z + "\n");
-            }
-            for (int i = 0; i < FinalTriangleList.Count; i += 3)
-            {
-                file.Write("f  " + (FinalTriangleList[i]+1) + "/0/0 " + (FinalTriangleList[i+1]+1) + "/0/0 " + (FinalTriangleList[i+2]+1) + "/0/0" + "\n");
-            }
+            file.Write(contents);
         }
     }
 
