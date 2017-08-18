@@ -18,7 +18,6 @@ public class ModelStreams
     public List<Vector3> VerticeAfterCompList;
     public List<Vector3> NormalAfterCompList;
     public List<int> TriangleAfterCompList;
-    public List<int> SubIndexList;//存放顶点列表每个subMesh的起始索引，顶点个数、索引个数
     //用于存储的顶点、法线和纹理
     public List<Vector3> FinalVerticeList;
     public List<Vector3> FinalNormalList;
@@ -94,7 +93,6 @@ public class ModelStreams
         VerticeAfterCompList = new List<Vector3>();
         NormalAfterCompList = new List<Vector3>();
         TriangleAfterCompList = new List<int>();
-        SubIndexList = new List<int>();
 
         using (BinaryReader reader = new BinaryReader(stream))
         {
@@ -173,6 +171,7 @@ public class ModelStreams
             vertices.RemoveAt(removes[i]);
             normals.RemoveAt(removes[i]);
         }
+
         List<int> tempTriList = new List<int>();
         for (int i = 0; i < triangleIndexs.Count; i++)
         {
@@ -182,9 +181,6 @@ public class ModelStreams
         VerticeAfterCompList.AddRange(vertices);
         NormalAfterCompList.AddRange(normals);
         TriangleAfterCompList.AddRange(tempTriList);
-        SubIndexList.Add(startIndex);
-        SubIndexList.Add(vertices.Count);
-        SubIndexList.Add(triangleIndexs.Count);
         startIndex = VerticeAfterCompList.Count;
         EditorUtility.ClearProgressBar();
     }
@@ -297,9 +293,11 @@ public class ModelStreams
             NormalList.Clear();
             TriangleList.Clear();
         }
+
         VerticeAfterCompList.Clear();
         NormalAfterCompList.Clear();
         TriangleAfterCompList.Clear();
+
     }
 }
 

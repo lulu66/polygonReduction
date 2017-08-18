@@ -18,9 +18,7 @@ public class ModelReductionEditor : EditorWindow {
     //used by .obj
     GameObject root;
     Mesh rootMeshes;
-    //used by .stl
-    GameObject[] temp;
-    Mesh[] tempMeshes;
+
     Options op;
     int perSubModelTriNum = 20000;
     int totalTriNum = 0;
@@ -34,6 +32,7 @@ public class ModelReductionEditor : EditorWindow {
     private PRTriangle[] prTriangles;
     private List<ReductionData> reductionData = new List<ReductionData>();
     bool initReduction = false;
+    bool bCanReduction = true;
     #endregion
 
     [MenuItem("Model/Analyse")]
@@ -70,9 +69,16 @@ public class ModelReductionEditor : EditorWindow {
     }
 
     #region 执行消减算法
+
     void ReduceInit()
     {
         vertices = modelStream.VerticeAfterCompList.ToArray();
+        if(vertices.Length > 65000)
+        {
+            Debug.Log("顶点数超过65000，初始化失败.");
+            bCanReduction = false;
+            return;
+        }
         normals = modelStream.NormalAfterCompList.ToArray() ;
         if(normals.Length == 0)
         {
@@ -126,6 +132,10 @@ public class ModelReductionEditor : EditorWindow {
             Debug.Log("还没初始化哦~~");
             return;
         }
+        if(bCanReduction == false)
+        {
+            return;
+        }
         if (reductionData != null)
         {
             reductionData.Clear();
@@ -158,39 +168,9 @@ public class ModelReductionEditor : EditorWindow {
         #region STL File
         else if (modelStream._suffix == "stl")
         {
-            for (int i = 0; i < count; i++)
-            {            
-                int startIndex = modelStream.SubIndexList[i * 3 + 0];
-                int tmpVertCount = modelStream.SubIndexList[i * 3 + 1];
-                int tmpTriCount = modelStream.SubIndexList[i * 3 + 2];
-                Vector3[] tmpVertices = new Vector3[tmpVertCount];
-                Vector3[] tmpNormals = new Vector3[tmpVertCount];
-                int[] tmpTriangles = new int[tmpTriCount];
-
-                for (int j = 0; j < tmpVertCount; j++)
-                {
-                    tmpVertices[j] = vertices[startIndex + j];
-                    tmpNormals[j] = normals[startIndex + j];
-                }
-
-                for(int j = 0; j < tmpTriCount; j++)
-                {
-                    int index = perSubModelTriNum * i * 3 + j;
-                    if (triangles[index] == 0)
-                    {
-                        tmpTriangles[j] = 0;
-                    }
-                    else
-                    {
-                       tmpTriangles[j] = triangles[index] - startIndex;
-                    }
-                }
-
-                tempMeshes[i].vertices = tmpVertices;
-                tempMeshes[i].triangles = tmpTriangles;
-                temp[i].GetComponent<MeshFilter>().mesh = tempMeshes[i];
-
-            }
+            rootMeshes.vertices = vertices;
+            rootMeshes.triangles = triangles;
+            root.GetComponent<MeshFilter>().mesh = rootMeshes;
         }
         #endregion
 
@@ -332,41 +312,22 @@ public class ModelReductionEditor : EditorWindow {
             #region STL File
             if (modelStream._suffix == "stl")
             {
-                count = totalTriNum / perSubModelTriNum;
-                count += (totalTriNum % perSubModelTriNum > 0) ? 1 : 0;
+                List<Vector3> vertsList = modelStream.VerticeList;
+                List<Vector3> norList = modelStream.NormalList;
+                List<int> triangleIndexs = modelStream.TriangleList;
 
-                temp = new GameObject[count];
-                tempMeshes = new Mesh[count];
+                modelStream.MeshCompression(vertsList, norList, triangleIndexs);
 
-                for (int i = 0; i < count; i++)
-                {
-                    temp[i] = new GameObject("modelSub" + i);
-                    temp[i].transform.SetParent(root.transform);
-                    temp[i].transform.localPosition = Vector3.zero;
-                    temp[i].transform.localScale = Vector3.one;
-                    MeshFilter mf = temp[i].AddComponent<MeshFilter>();
-                    MeshRenderer mr = temp[i].AddComponent<MeshRenderer>();
-                    int startIndex = i * perSubModelTriNum * 3;
-                    int length = perSubModelTriNum * 3;
-                    if (startIndex + length > totalTriNum * 3)
-                    {
-                        length = totalTriNum * 3 - startIndex;
-                    }
+                MeshFilter mf = root.AddComponent<MeshFilter>();
+                MeshRenderer mr = root.AddComponent<MeshRenderer>();
 
-                    List<Vector3> vertsList = modelStream.VerticeList.GetRange(startIndex, length);
-                    List<Vector3> norList = modelStream.NormalList.GetRange(startIndex, length);
-                    List<int> triangleIndexs = modelStream.TriangleList.GetRange(0, length);
-
-                    modelStream.MeshCompression(vertsList, norList, triangleIndexs);
-
-                    tempMeshes[i] = new Mesh();
-                    tempMeshes[i].name = temp[i].name;
-                    tempMeshes[i].vertices = vertsList.ToArray();
-                    tempMeshes[i].normals = norList.ToArray();
-                    tempMeshes[i].triangles = triangleIndexs.ToArray();
-                    mf.mesh = tempMeshes[i];
-                    mr.material = new Material(Shader.Find("Standard"));
-                }
+                rootMeshes = new Mesh();
+                rootMeshes.name = root.name;
+                rootMeshes.vertices = modelStream.VerticeAfterCompList.ToArray();
+                rootMeshes.normals = modelStream.NormalAfterCompList.ToArray();
+                rootMeshes.triangles = modelStream.TriangleAfterCompList.ToArray();
+                mf.mesh = rootMeshes;
+                mr.material = new Material(Shader.Find("Standard"));
             }
             #endregion
 
@@ -497,14 +458,6 @@ public class ModelReductionEditor : EditorWindow {
 
     void ClearGameObjects()
     {
-        if(modelStream._suffix == "stl")
-        {
-            for(int i = 0; i < count; i++)
-            {
-                DestroyImmediate(temp[i]);
-                DestroyImmediate(tempMeshes[i]);
-            }
-        }
         DestroyImmediate(root);
         root = null;
     }
