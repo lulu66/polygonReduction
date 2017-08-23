@@ -89,12 +89,7 @@ public class ModelReductionEditor : EditorWindow {
             bCanReduction = false;
             return;
         }
-        //normals = modelStream.NormalAfterCompList.ToArray() ;
 
-        //if(normals.Length == 0)
-        //{
-        //    normals = new Vector3[vertices.Length];
-        //}
         triangles = modelStream.TriangleAfterCompList;
 
         modelReduct = new ModelReduction(vertices, triangles);
@@ -119,12 +114,15 @@ public class ModelReductionEditor : EditorWindow {
 
         modelReduct.Reduce(reduceVertNum, triangles);
 
+        #region OBJ File
         if (modelStream._suffix == "obj")
         {
             rootMeshes.vertices = vertices.ToArray();
             rootMeshes.triangles = triangles.ToArray();
+            rootMeshes.RecalculateNormals();
             root.GetComponent<MeshFilter>().mesh = rootMeshes;
         }
+        #endregion
 
         #region STL File
         else if (modelStream._suffix == "stl")
@@ -244,43 +242,8 @@ public class ModelReductionEditor : EditorWindow {
             Debug.Log("vertice | triangles length is zero.");
             return;
         }
-        modelStream.FinalVerticeList = new List<Vector3>();
-        modelStream.FinalNormalList = new List<Vector3>();
-        modelStream.FinalTriangleList = new List<int>();
 
-            //find useful indexes
-            for(int i = 0; i < triangles.Count; i += 3)
-            {
-                if(triangles[i] != 0 || triangles[i+1] != 0 || triangles[i+2] != 0)
-                {
-                    modelStream.FinalTriangleList.Add(triangles[i]);
-                    modelStream.FinalTriangleList.Add(triangles[i+1]);
-                    modelStream.FinalTriangleList.Add(triangles[i+2]);
-                }
-            }
-
-            for(int i = 0; i < modelStream.FinalTriangleList.Count; i++)
-            {
-                EditorUtility.DisplayProgressBar("存储", "正在存储模型......", (float)i / modelStream.FinalTriangleList.Count);
-                int index = modelStream.FinalTriangleList[i];
-                Vector3 vert = vertices[index];
-                bool bContain = false;
-                for(int j = 0; j < modelStream.FinalVerticeList.Count; j++)
-                {
-                    if (vert.Equals(modelStream.FinalVerticeList[j]))
-                    {
-                        modelStream.FinalTriangleList[i] = j;
-                        bContain = true;
-                        break;
-                    }
-                }
-                if(bContain == false)
-                {
-                    modelStream.FinalVerticeList.Add(vertices[index]); 
-                    modelStream.FinalTriangleList[i] = modelStream.FinalVerticeList.Count - 1;
-                }
-            }
-            EditorUtility.ClearProgressBar();
+        modelStream.CompressModel(vertices, triangles);
 
         string modelPath = Path.Combine(Application.streamingAssetsPath, "ReductionModel");
         if (!Directory.Exists(modelPath))

@@ -277,6 +277,47 @@ public class ModelStreams
         }
     }
 
+    public void CompressModel(List<Vector3> vertices, List<int> triangles)
+    {
+        FinalVerticeList = new List<Vector3>();
+        FinalNormalList = new List<Vector3>();
+        FinalTriangleList = new List<int>();
+
+        //find useful indexes
+        for (int i = 0; i < triangles.Count; i += 3)
+        {
+            if (triangles[i] != 0 || triangles[i + 1] != 0 || triangles[i + 2] != 0)
+            {
+                FinalTriangleList.Add(triangles[i]);
+                FinalTriangleList.Add(triangles[i + 1]);
+                FinalTriangleList.Add(triangles[i + 2]);
+            }
+        }
+
+        for (int i = 0; i < FinalTriangleList.Count; i++)
+        {
+            EditorUtility.DisplayProgressBar("存储", "正在存储模型......", (float)i / FinalTriangleList.Count);
+            int index = FinalTriangleList[i];
+            Vector3 vert = vertices[index];
+            bool bContain = false;
+            for (int j = 0; j < FinalVerticeList.Count; j++)
+            {
+                if (vert.Equals(FinalVerticeList[j]))
+                {
+                    FinalTriangleList[i] = j;
+                    bContain = true;
+                    break;
+                }
+            }
+            if (bContain == false)
+            {
+                FinalVerticeList.Add(vertices[index]);
+                FinalTriangleList[i] = FinalVerticeList.Count - 1;
+            }
+        }
+        EditorUtility.ClearProgressBar();
+    }
+
     private string GetSuffix(string name)
     {
         string[] array = name.Split('.');
