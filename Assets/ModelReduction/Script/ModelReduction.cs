@@ -9,19 +9,19 @@ public class ModelReduction{
     public PRTriangle[] prTriangles;
     private List<ReductionData> reductionData = new List<ReductionData>();
 
-    public ModelReduction(Vector3[] vertices, int[] triangles)
+    public ModelReduction(List<Vector3> vertices, List<int> triangles)
     {
-        prVertices = new PRVertex[vertices.Length];
-        prTriangles = new PRTriangle[triangles.Length / 3];
+        prVertices = new PRVertex[vertices.Count];
+        prTriangles = new PRTriangle[triangles.Count / 3];
 
         int i, j;
         //初始化所有顶点的id和pos
-        for (i = 0; i < vertices.Length; ++i)
+        for (i = 0; i < vertices.Count; ++i)
         {
             prVertices[i] = new PRVertex(i, vertices[i]);
         }
         //初始化所有三角形的id和包含的三个顶点
-        for (i = 0, j = 0; i < triangles.Length; i += 3, j += 1)
+        for (i = 0, j = 0; i < triangles.Count; i += 3, j += 1)
         {
             prTriangles[j] = new PRTriangle(i, prVertices[triangles[i]], prVertices[triangles[i + 1]], prVertices[triangles[i + 2]]);
         }
@@ -94,7 +94,7 @@ public class ModelReduction{
         return edgeLength * curvature;
     }
 
-    public void Reduce(int reduceVertNum, int[] triangles)
+    public void Reduce(int reduceVertNum, List<int> triangles)
     {
         if (reductionData != null)
         {
@@ -117,7 +117,7 @@ public class ModelReduction{
         EditorUtility.ClearProgressBar();
     }
 
-    void ApplyData(ReductionData rd, int[] triangles)
+    void ApplyData(ReductionData rd, List<int> triangles)
     {
         for (int i = 0; i < rd.triangleID.Count; i++)
         {

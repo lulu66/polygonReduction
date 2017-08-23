@@ -27,9 +27,12 @@ public class ModelReductionEditor : EditorWindow {
     #region 关于消减
     ModelReduction modelReduct;
 
-    private Vector3[] vertices;
-    private Vector3[] normals;
-    private int[] triangles;
+    //private Vector3[] vertices;
+    //private Vector3[] normals;
+    //private int[] triangles;
+
+    private List<Vector3> vertices;
+    private List<int> triangles;
 
     bool initReduction = false;
     bool bCanReduction = true;
@@ -45,6 +48,7 @@ public class ModelReductionEditor : EditorWindow {
 
     void LoadModel()
     {
+        
         string fileType = "";
         if(op == Options.obj)
         {
@@ -77,21 +81,21 @@ public class ModelReductionEditor : EditorWindow {
 
     void ReduceInit()
     {
-        vertices = modelStream.VerticeAfterCompList.ToArray();
+        vertices = modelStream.VerticeAfterCompList;
 
-        if(vertices.Length > 65000)
+        if(vertices.Count> 65000)
         {
             Debug.Log("顶点数超过65000，初始化失败.");
             bCanReduction = false;
             return;
         }
-        normals = modelStream.NormalAfterCompList.ToArray() ;
+        //normals = modelStream.NormalAfterCompList.ToArray() ;
 
-        if(normals.Length == 0)
-        {
-            normals = new Vector3[vertices.Length];
-        }
-        triangles = modelStream.TriangleAfterCompList.ToArray();
+        //if(normals.Length == 0)
+        //{
+        //    normals = new Vector3[vertices.Length];
+        //}
+        triangles = modelStream.TriangleAfterCompList;
 
         modelReduct = new ModelReduction(vertices, triangles);
 
@@ -117,16 +121,16 @@ public class ModelReductionEditor : EditorWindow {
 
         if (modelStream._suffix == "obj")
         {
-            rootMeshes.vertices = vertices;
-            rootMeshes.triangles = triangles;
+            rootMeshes.vertices = vertices.ToArray();
+            rootMeshes.triangles = triangles.ToArray();
             root.GetComponent<MeshFilter>().mesh = rootMeshes;
         }
 
         #region STL File
         else if (modelStream._suffix == "stl")
         {
-            rootMeshes.vertices = vertices;
-            rootMeshes.triangles = triangles;
+            rootMeshes.vertices = vertices.ToArray();
+            rootMeshes.triangles = triangles.ToArray();
             root.GetComponent<MeshFilter>().mesh = rootMeshes;
         }
         #endregion
@@ -179,6 +183,7 @@ public class ModelReductionEditor : EditorWindow {
                 rootMeshes.vertices = modelStream.VerticeAfterCompList.ToArray();
                 rootMeshes.normals = modelStream.NormalAfterCompList.ToArray();
                 rootMeshes.triangles = modelStream.TriangleAfterCompList.ToArray();
+                rootMeshes.RecalculateNormals();
                 mf.mesh = rootMeshes;
                 mr.material = new Material(Shader.Find("Standard"));
             }
@@ -234,9 +239,9 @@ public class ModelReductionEditor : EditorWindow {
 
     void SaveModel()//均存储为.obj文件
     {
-        if (vertices.Length == 0 || normals.Length == 0 || triangles.Length == 0)
+        if (vertices.Count == 0 || triangles.Count == 0)
         {
-            Debug.Log("vertice | normals | triangles length is zero.");
+            Debug.Log("vertice | triangles length is zero.");
             return;
         }
         modelStream.FinalVerticeList = new List<Vector3>();
@@ -244,7 +249,7 @@ public class ModelReductionEditor : EditorWindow {
         modelStream.FinalTriangleList = new List<int>();
 
             //find useful indexes
-            for(int i = 0; i < triangles.Length; i += 3)
+            for(int i = 0; i < triangles.Count; i += 3)
             {
                 if(triangles[i] != 0 || triangles[i+1] != 0 || triangles[i+2] != 0)
                 {
@@ -272,7 +277,6 @@ public class ModelReductionEditor : EditorWindow {
                 if(bContain == false)
                 {
                     modelStream.FinalVerticeList.Add(vertices[index]); 
-                    modelStream.FinalNormalList.Add(normals[index]);
                     modelStream.FinalTriangleList[i] = modelStream.FinalVerticeList.Count - 1;
                 }
             }

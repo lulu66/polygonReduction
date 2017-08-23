@@ -22,9 +22,11 @@ public class PRTriangle
     {
         Vector3 p1 = vertex[1].pos - vertex[0].pos;
         Vector3 p2 = vertex[2].pos - vertex[1].pos;
+        
+        normal = Vector3.Cross(p1, p2);
         if (Vector3.Dot(normal, normal) == 0)
             return;
-        normal = Vector3.Cross(p1, p2).normalized;
+        normal = normal.normalized;
     }
 
     public bool HasVertex(PRVertex v)
@@ -40,8 +42,6 @@ public class PRTriangle
 
     public void ReplaceVertex(PRVertex u, PRVertex v)
     {
-            v.AddFace(this);
-
         if (vertex[0] == u)
         {
             vertex[0] = v;
@@ -54,6 +54,8 @@ public class PRTriangle
         {
             vertex[2] = v;
         }
+
+        v.AddFace(this);
         for (int i = 0; i < 3; i++)
         {
             if (vertex[i].neighbor.Contains(u))

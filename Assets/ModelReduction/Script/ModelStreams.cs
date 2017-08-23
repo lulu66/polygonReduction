@@ -255,6 +255,7 @@ public class ModelStreams
         {
             sb.Append(string.Format("v {0} {1} {2}\n", vec.x, vec.y, vec.z));
         }
+        sb.Append("# ");
         sb.Append("\n");
 
         foreach (Vector3 vec in FinalNormalList)
@@ -268,6 +269,7 @@ public class ModelStreams
             sb.Append(string.Format("f {0}/{0}/{0} {1}/{1}/{1} {2}/{2}/{2}\n", FinalTriangleList[i] + 1, 
                 FinalTriangleList[i+1] + 1, FinalTriangleList[i+2] + 1));
         }
+       // sb.Append("# {0}\n", FinalTriangleList.Count);
         string contents = sb.ToString();
         using (StreamWriter file = new StreamWriter(stream))
         {
