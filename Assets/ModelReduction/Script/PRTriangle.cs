@@ -21,7 +21,9 @@ public class PRTriangle
     public void ComputeNormal()
     {
         Vector3 p1 = vertex[1].pos - vertex[0].pos;
-        Vector3 p2 = vertex[2].pos - vertex[0].pos;
+        Vector3 p2 = vertex[2].pos - vertex[1].pos;
+        if (Vector3.Dot(normal, normal) == 0)
+            return;
         normal = Vector3.Cross(p1, p2).normalized;
     }
 
