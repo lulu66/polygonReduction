@@ -42,28 +42,55 @@ public class PRTriangle
 
     public void ReplaceVertex(PRVertex u, PRVertex v)
     {
+        if (u == null || v == null)
+        {
+            Debug.Log("a certain vertex is null.");
+            return;
+        }
+        if(!(u == vertex[0] || u == vertex[1] || u == vertex[2]))
+        {
+            Debug.Log("old vertice is not one of the vertices in the triangle.");
+            return;
+        }
+        if(v == vertex[0] || v == vertex[1] || v == vertex[2])
+        {
+            Debug.Log("new vertex can not be equal to vertex 0|1|2.");
+            return;
+        }
         if (vertex[0] == u)
         {
             vertex[0] = v;
         }
-        if (vertex[1] == u)
+        else if (vertex[1] == u)
         {
             vertex[1] = v;
         }
-        if (vertex[2] == u)
+        else if (vertex[2] == u)
         {
             vertex[2] = v;
         }
 
+        u.RemoveFace(this);
         v.AddFace(this);
+
+        for(int i = 0; i < 3; i++)
+        {
+            u.RemoveIfNonNeighbor(vertex[i]);
+            vertex[i].RemoveIfNonNeighbor(u);
+        }
+
         for (int i = 0; i < 3; i++)
         {
-            if (vertex[i].neighbor.Contains(u))
+            for(int j = 0; j < 3; j++)
             {
-                vertex[i].neighbor.Remove(u);
-                vertex[i].AddNeighbor(v);
+                if(i != j)
+                {
+                    if (!vertex[i].neighbor.Contains(vertex[j]))
+                    {
+                        vertex[i].neighbor.Add(vertex[j]);
+                    }
+                }
             }
-            v.AddNeighbor(vertex[i]);
         }
         ComputeNormal();
     }

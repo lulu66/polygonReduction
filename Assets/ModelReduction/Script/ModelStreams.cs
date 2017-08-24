@@ -10,10 +10,7 @@ public class ModelStreams
 {
 
     public List<Triangle> triList;
-    //只针对stl文件，压缩前的顶点、法线和纹理
-    public List<Vector3> VerticeList;
-    public List<Vector3> NormalList;
-    public List<int> TriangleList;
+
     //压缩后，顶点唯一
     public List<Vector3> VerticeAfterCompList;
     public List<Vector3> NormalAfterCompList;
@@ -86,9 +83,9 @@ public class ModelStreams
     //解析二进制格式的stl文件
     private void LoadBinarySTLModelFile(Stream stream)
     {
-        VerticeList = new List<Vector3>();
-        NormalList = new List<Vector3>();
-        TriangleList = new List<int>();
+        List<Vector3>  VerticeList = new List<Vector3>();
+        List<Vector3>  NormalList = new List<Vector3>();
+        List<int>  TriangleList = new List<int>();
 
         VerticeAfterCompList = new List<Vector3>();
         NormalAfterCompList = new List<Vector3>();
@@ -136,9 +133,11 @@ public class ModelStreams
                 number += 1;
             }
         }
+
+        MeshCompression(VerticeList, NormalList, TriangleList);
     }
 
-    public void MeshCompression(List<Vector3>vertices, List<Vector3>normals, List<int>triangleIndexs)
+    private void MeshCompression(List<Vector3>vertices, List<Vector3>normals, List<int>triangleIndexs)
     {
         int offset = 0;
         //需要删除的顶点索引集合
@@ -201,28 +200,39 @@ public class ModelStreams
         NormalAfterCompList = new List<Vector3>();
         TriangleAfterCompList = new List<int>();
 
+        rabData rd = new rabData();
         using (StreamReader file = new StreamReader(stream))
         { 
-            string line = "";
-            while(file.Peek() != -1)
-            {
-                line = file.ReadLine();
-                line = line.Replace("  "," ");
-                string[] chars = line.Split(' ');
-                switch (chars[0])
-                {
-                    case "v":
-                        VerticeAfterCompList.Add(new Vector3(Convert.ToSingle(chars[1]), Convert.ToSingle(chars[2]), Convert.ToSingle(chars[3])));
-                        break;
-                    case "vn":
-                        NormalAfterCompList.Add(new Vector3(Convert.ToSingle(chars[1]), Convert.ToSingle(chars[2]), Convert.ToSingle(chars[3])));
-                        break;
-                    case "f":
-                        GetTriangleList(chars);
-                        _totalTriNum++;
-                        break;
-                }
-            }
+            //string line = "";
+            //while(file.Peek() != -1)
+            //{
+            //    line = file.ReadLine();
+            //    line = line.Replace("  "," ");
+            //    string[] chars = line.Split(' ');
+            //    switch (chars[0])
+            //    {
+            //        case "v":
+            //            VerticeAfterCompList.Add(new Vector3(Convert.ToSingle(chars[1]), Convert.ToSingle(chars[2]), Convert.ToSingle(chars[3])));
+            //            break;
+            //        case "vn":
+            //            NormalAfterCompList.Add(new Vector3(Convert.ToSingle(chars[1]), Convert.ToSingle(chars[2]), Convert.ToSingle(chars[3])));
+            //            break;
+            //        case "f":
+            //            GetTriangleList(chars);
+            //            _totalTriNum++;
+            //            break;
+            //    }
+            //}
+        }
+        for(int i = 0; i < 453; i++)
+        {
+            VerticeAfterCompList.Add(new Vector3(rd.rabbit_vertices[i,0], rd.rabbit_vertices[i, 1], rd.rabbit_vertices[i, 2]));
+        }
+        for(int i = 0; i < 902; i++)
+        {
+            TriangleAfterCompList.Add(rd.rabbit_triangles[i, 0]);
+            TriangleAfterCompList.Add(rd.rabbit_triangles[i, 1]);
+            TriangleAfterCompList.Add(rd.rabbit_triangles[i, 2]);
         }
     }
 
@@ -269,7 +279,7 @@ public class ModelStreams
             sb.Append(string.Format("f {0}/{0}/{0} {1}/{1}/{1} {2}/{2}/{2}\n", FinalTriangleList[i] + 1, 
                 FinalTriangleList[i+1] + 1, FinalTriangleList[i+2] + 1));
         }
-       // sb.Append("# {0}\n", FinalTriangleList.Count);
+        sb.Append(string.Format("# {0}\n", FinalTriangleList.Count/3));
         string contents = sb.ToString();
         using (StreamWriter file = new StreamWriter(stream))
         {
@@ -330,17 +340,9 @@ public class ModelStreams
 
     public void Clear()
     {
-        if(VerticeList != null)
-        {
-            VerticeList.Clear();
-            NormalList.Clear();
-            TriangleList.Clear();
-        }
-
         VerticeAfterCompList.Clear();
         NormalAfterCompList.Clear();
         TriangleAfterCompList.Clear();
-
     }
 }
 

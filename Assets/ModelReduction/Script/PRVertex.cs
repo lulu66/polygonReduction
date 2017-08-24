@@ -30,4 +30,23 @@ public class PRVertex
         }
     }
 
+    public void RemoveFace(PRTriangle t)
+    {
+        if (face.Contains(t))
+        {
+            face.Remove(t);
+        }
+    }
+
+    public void RemoveIfNonNeighbor(PRVertex n)
+    {
+        if (!neighbor.Contains(n))
+            return;
+        for(int i = 0; i < face.Count; i++)
+        {
+            if (face[i].HasVertex(n))
+                return;
+        }
+        neighbor.Remove(n);
+    }
 }

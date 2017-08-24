@@ -18,21 +18,16 @@ public class ModelReductionEditor : EditorWindow {
     //used by .obj
     GameObject root;
     Mesh rootMeshes;
-
     Options op;
-    int perSubModelTriNum = 20000;
-    int totalTriNum = 0;
-    int count = 0;//subMesh count
 
     #region 关于消减
     ModelReduction modelReduct;
 
-    //private Vector3[] vertices;
-    //private Vector3[] normals;
-    //private int[] triangles;
-
     private List<Vector3> vertices;
     private List<int> triangles;
+
+    private List<Vector3> renderVertices = new List<Vector3>();
+    private List<int> renderTriangles = new List<int>();
 
     bool initReduction = false;
     bool bCanReduction = true;
@@ -74,10 +69,7 @@ public class ModelReductionEditor : EditorWindow {
 
         fs.Close();
 
-        totalTriNum = modelStream._totalTriNum;
     }
-
-    #region 执行消减算法
 
     void ReduceInit()
     {
@@ -93,7 +85,8 @@ public class ModelReductionEditor : EditorWindow {
         triangles = modelStream.TriangleAfterCompList;
 
         modelReduct = new ModelReduction(vertices, triangles);
-
+        modelReduct.ProgressiveMesh();
+        modelReduct.PermuteVertices(vertices, triangles);
         initReduction = true;
     }
 
@@ -109,83 +102,41 @@ public class ModelReductionEditor : EditorWindow {
             return;
         }
         
-        int reduceVertNum = vertNumGUIBefore - vertNumGUI;
-        Debug.Log("模型顶点数减少了 " + reduceVertNum + " 个.");
-
-        modelReduct.Reduce(reduceVertNum, triangles);
-
-        #region OBJ File
-        if (modelStream._suffix == "obj")
+        int curNum = vertNumGUI;
+        if(curNum > modelStream.VerticeAfterCompList.Count)
         {
-            rootMeshes.vertices = vertices.ToArray();
-            rootMeshes.triangles = triangles.ToArray();
-            rootMeshes.RecalculateNormals();
-            root.GetComponent<MeshFilter>().mesh = rootMeshes;
+            curNum = modelStream.VerticeAfterCompList.Count;
         }
-        #endregion
+        Debug.Log("模型顶点数减少了 " + curNum + " 个.");
 
-        #region STL File
-        else if (modelStream._suffix == "stl")
-        {
-            rootMeshes.vertices = vertices.ToArray();
-            rootMeshes.triangles = triangles.ToArray();
-            root.GetComponent<MeshFilter>().mesh = rootMeshes;
-        }
-        #endregion
+        modelReduct.Reduce(curNum, vertices, triangles,  renderVertices, renderTriangles);
+
+        rootMeshes.vertices = renderVertices.ToArray();
+        rootMeshes.triangles = renderTriangles.ToArray();
+        rootMeshes.RecalculateNormals();
+        root.GetComponent<MeshFilter>().mesh = rootMeshes;
 
         vertNumGUIBefore = vertNumGUI;
     }
 
-
-
-    #endregion
-
     void DrawInitModel()
     {
-        if (modelStream.VerticeList != null || modelStream.VerticeAfterCompList != null)
+        if (modelStream.VerticeAfterCompList != null)
         {
             root = new GameObject("model");
             root.transform.localPosition = Vector3.zero;
             root.transform.localScale = Vector3.one;
 
-            #region STL File
-            if (modelStream._suffix == "stl")
-            {
-                List<Vector3> vertsList = modelStream.VerticeList;
-                List<Vector3> norList = modelStream.NormalList;
-                List<int> triangleIndexs = modelStream.TriangleList;
+            MeshFilter mf = root.AddComponent<MeshFilter>();
+            MeshRenderer mr = root.AddComponent<MeshRenderer>();
 
-                modelStream.MeshCompression(vertsList, norList, triangleIndexs);
-
-                MeshFilter mf = root.AddComponent<MeshFilter>();
-                MeshRenderer mr = root.AddComponent<MeshRenderer>();
-
-                rootMeshes = new Mesh();
-                rootMeshes.name = root.name;
-                rootMeshes.vertices = modelStream.VerticeAfterCompList.ToArray();
-                rootMeshes.normals = modelStream.NormalAfterCompList.ToArray();
-                rootMeshes.triangles = modelStream.TriangleAfterCompList.ToArray();
-                mf.mesh = rootMeshes;
-                mr.material = new Material(Shader.Find("Standard"));
-            }
-            #endregion
-
-            #region OBJ File
-            else if (modelStream._suffix == "obj")
-            {
-                MeshFilter mf = root.AddComponent<MeshFilter>();
-                MeshRenderer mr = root.AddComponent<MeshRenderer>();
-
-                rootMeshes = new Mesh();
-                rootMeshes.name = root.name;
-                rootMeshes.vertices = modelStream.VerticeAfterCompList.ToArray();
-                rootMeshes.normals = modelStream.NormalAfterCompList.ToArray();
-                rootMeshes.triangles = modelStream.TriangleAfterCompList.ToArray();
-                rootMeshes.RecalculateNormals();
-                mf.mesh = rootMeshes;
-                mr.material = new Material(Shader.Find("Standard"));
-            }
-            #endregion
+            rootMeshes = new Mesh();
+            rootMeshes.name = root.name;
+            rootMeshes.vertices = modelStream.VerticeAfterCompList.ToArray();
+            rootMeshes.triangles = modelStream.TriangleAfterCompList.ToArray();
+            rootMeshes.RecalculateNormals();
+            mf.mesh = rootMeshes;
+            mr.material = new Material(Shader.Find("Standard"));
 
             vertNumGUI = modelStream.VerticeAfterCompList.Count;
             vertNumGUIBefore = vertNumGUI;

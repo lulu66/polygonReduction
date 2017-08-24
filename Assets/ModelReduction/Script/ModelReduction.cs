@@ -5,34 +5,36 @@ using UnityEditor;
 
 public class ModelReduction{
 
-    public PRVertex[] prVertices;
-    public PRTriangle[] prTriangles;
-    private List<ReductionData> reductionData = new List<ReductionData>();
+    //public PRVertex[] prVertices;
+    //public PRTriangle[] prTriangles;
+    public int renderTriNum = 0;
+    public List<PRVertex> prVertices;
+    public List<PRTriangle> prTriangles;
+    public int[] collapse_map;
+    private int[] permutation;
 
     public ModelReduction(List<Vector3> vertices, List<int> triangles)
     {
-        prVertices = new PRVertex[vertices.Count];
-        prTriangles = new PRTriangle[triangles.Count / 3];
+        prVertices = new List<PRVertex>();
+        prTriangles = new List<PRTriangle>();
 
         int i, j;
         //初始化所有顶点的id和pos
         for (i = 0; i < vertices.Count; ++i)
         {
-            prVertices[i] = new PRVertex(i, vertices[i]);
+            prVertices.Add(new PRVertex(i, vertices[i]));
         }
         //初始化所有三角形的id和包含的三个顶点
         for (i = 0, j = 0; i < triangles.Count; i += 3, j += 1)
         {
-            prTriangles[j] = new PRTriangle(i, prVertices[triangles[i]], prVertices[triangles[i + 1]], prVertices[triangles[i + 2]]);
+            prTriangles.Add(new PRTriangle(i, prVertices[triangles[i]], prVertices[triangles[i + 1]], prVertices[triangles[i + 2]]));
         }
         //为三角形中的每个顶点添加邻居三角形和邻居顶点
-        for (i = 0; i < prTriangles.Length; i++)
+        for (i = 0; i < prTriangles.Count; i++)
         {
-            prTriangles[i].vertex[0].face.Add(prTriangles[i]);
-            prTriangles[i].vertex[1].face.Add(prTriangles[i]);
-            prTriangles[i].vertex[2].face.Add(prTriangles[i]);
             for (j = 0; j < 3; j++)
             {
+                prTriangles[i].vertex[j].face.Add(prTriangles[i]);
                 for (int k = 0; k < 3; k++)
                 {
                     if (k == j) continue;
@@ -44,9 +46,52 @@ public class ModelReduction{
             }
         }
         //计算每个顶点向它的邻居边坍塌的代价
-        for (i = 0; i < prVertices.Length; i++)
+        for (i = 0; i < prVertices.Count; i++)
         {
             ComputeCostPerVertex(prVertices[i]);
+        }
+    }
+
+    public void ProgressiveMesh()
+    {
+        permutation = new int[prVertices.Count];
+        collapse_map = new int[prVertices.Count];
+        while(prVertices.Count > 0)
+        {
+            PRVertex mn = MinCostVertex();
+            permutation[mn.id] = prVertices.Count - 1;
+            collapse_map[prVertices.Count - 1] = (mn.collapse != null) ? mn.collapse.id : -1;
+            Collapse(mn, mn.collapse);
+        }
+
+        for(int i = 0; i < collapse_map.Length; i++)
+        {
+            collapse_map[i] = (collapse_map[i] == -1) ? 0 : permutation[collapse_map[i]];
+        }
+    }
+
+    public void PermuteVertices(List<Vector3> vert, List<int> tri)
+    {
+        // rearrange the vertex Array 
+        List<Vector3> temp_Array = new List<Vector3>();
+        int i;
+
+        for (i = 0; i < vert.Count; i++)
+        {
+            temp_Array.Add(vert[i]);
+        }
+        for (i = 0; i < vert.Count; i++)
+        {
+            vert[permutation[i]] = temp_Array[i];
+        }
+        // update the changes in the entries in the triangle Array
+        int triCount = tri.Count / 3;
+        for (i = 0; i < triCount; i++)
+        {
+            for (int j = 0; j < 3; j++)
+            {
+                tri[i * 3 + j] = permutation[tri[i * 3 + j]];
+            }
         }
     }
 
@@ -94,58 +139,33 @@ public class ModelReduction{
         return edgeLength * curvature;
     }
 
-    public void Reduce(int reduceVertNum, List<int> triangles)
+    public void Reduce(int curNum, List<Vector3> vertices, List<int> triangles, List<Vector3> renderVerts, List<int> renderTri)
     {
-        if (reductionData != null)
+        if(renderVerts.Count != 0 || renderTri.Count != 0)
         {
-            reductionData.Clear();
+            renderVerts.Clear();
+            renderTri.Clear();
         }
-
+        int triCount = triangles.Count / 3;
         //执行坍塌算法的次数
-        for (int i = 0; i < reduceVertNum; i++)
+        for (int i = 0; i < triCount; i++)
         {
-            EditorUtility.DisplayProgressBar("减面", "正在减面......", (float)i / reduceVertNum);
-            PRVertex min = MinCostVertex();
-            Collapse(min, min.collapse);
+//            EditorUtility.DisplayProgressBar("减面", "正在减面......", (float)i / triCount);
+            int p0 = Map(triangles[i * 3 + 0], curNum);
+            int p1 = Map(triangles[i * 3 + 1], curNum);
+            int p2 = Map(triangles[i * 3 + 2], curNum);
+            if (p0 == p1 || p1 == p2 || p2 == p0)
+                continue;
+            renderTriNum++;
+
+            renderVerts.Add(vertices[p0]);
+            renderVerts.Add(vertices[p1]);
+            renderVerts.Add(vertices[p2]);
+            renderTri.Add(p0);
+            renderTri.Add(p1);
+            renderTri.Add(p2);
         }
-
-        for (int i = 0; i < reductionData.Count; i++)
-        {
-            ApplyData(reductionData[i], triangles);
-        }
-
-        EditorUtility.ClearProgressBar();
-    }
-
-    void ApplyData(ReductionData rd, List<int> triangles)
-    {
-        for (int i = 0; i < rd.triangleID.Count; i++)
-        {
-            //如果其中有一个点是坍塌指向的点，则包含该点的三角形索引全部为0
-            if (triangles[rd.triangleID[i]] == rd.vertexV || triangles[rd.triangleID[i] + 1] == rd.vertexV || triangles[rd.triangleID[i] + 2] == rd.vertexV)
-            {
-                triangles[rd.triangleID[i]] = triangles[rd.triangleID[i] + 1] = triangles[rd.triangleID[i] + 2] = 0;
-            }
-            else//如果其中一个点是坍塌点，则该点的索引变为坍塌指向的点
-            {
-                if (triangles[rd.triangleID[i]] == rd.vertexU)
-                {
-                    triangles[rd.triangleID[i]] = rd.vertexV;
-                    continue;
-                }
-                if (triangles[rd.triangleID[i] + 1] == rd.vertexU)
-                {
-                    triangles[rd.triangleID[i] + 1] = rd.vertexV;
-                    continue;
-                }
-                if (triangles[rd.triangleID[i] + 2] == rd.vertexU)
-                {
-                    triangles[rd.triangleID[i] + 2] = rd.vertexV;
-                    continue;
-                }
-            }
-
-        }
+//        EditorUtility.ClearProgressBar();
     }
 
     //顶点和边的坍塌操作
@@ -153,6 +173,7 @@ public class ModelReduction{
     {
         if (v == null)
         {
+            prVertices.Remove(u);
             return;
         }
         List<PRVertex> tmp = new List<PRVertex>();
@@ -160,32 +181,32 @@ public class ModelReduction{
         {
             tmp.Add(u.neighbor[i]);
         }
-        ReductionData rd = new ReductionData();
-        rd.vertexU = u.id;
-        rd.vertexV = v.id;
-        v.neighbor.Remove(u);
+
+        for (int i = u.face.Count - 1; i >= 0; i--)
+        {
+            if (u.face[i].HasVertex(v))
+            {
+                u.face.Remove(u.face[i]);
+            }
+        }
 
         for (int i = u.face.Count - 1; i >= 0; i--)
         {
             u.face[i].ReplaceVertex(u, v);
         }
-        for (int i = 0; i < u.face.Count; i++)
-        {
-            rd.triangleID.Add(u.face[i].id);
-        }
-        reductionData.Add(rd);
-        ComputeCostPerVertex(v);
+
+        prVertices.Remove(u);
+
         for (int i = 0; i < tmp.Count; i++)
         {
             ComputeCostPerVertex(tmp[i]);
         }
-        u.cost = 1000000f;
     }
 
     private PRVertex MinCostVertex()
     {
         PRVertex vert = prVertices[0];
-        for (int i = 0; i < prVertices.Length; i++)
+        for (int i = 0; i < prVertices.Count; i++)
         {
             if (vert.cost > prVertices[i].cost)
             {
@@ -195,4 +216,13 @@ public class ModelReduction{
         return vert;
     }
 
+    private int Map(int a, int mx)
+    {
+        if (mx <= 0) return 0;
+        while (a >= mx)
+        {
+            a = collapse_map[a];
+        }
+        return a;
+    }
 }
