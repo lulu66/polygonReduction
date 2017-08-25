@@ -32,9 +32,17 @@ public class PRVertex
 
     public void RemoveFace(PRTriangle t)
     {
+        if (!face.Contains(t))
+        {
+            Debug.Log("u has no current triangle.");
+        }
         if (face.Contains(t))
         {
             face.Remove(t);
+        }
+        if (face.Contains(t))
+        {
+            Debug.Log("still exist triangle t.");
         }
     }
 
@@ -48,5 +56,22 @@ public class PRVertex
                 return;
         }
         neighbor.Remove(n);
+        if (neighbor.Contains(n))
+        {
+            Debug.Log("still exsist vertex n.");
+        }
+    }
+
+    public void DeleteVertex()
+    {
+        if (face.Count != 0)
+        {
+            Debug.Log("the faces is not null.");
+        }
+        while (neighbor.Count > 0)
+        {
+            neighbor[0].neighbor.Remove(this);
+            neighbor.Remove(neighbor[0]);
+        }        
     }
 }

@@ -5,8 +5,6 @@ using UnityEditor;
 
 public class ModelReduction{
 
-    //public PRVertex[] prVertices;
-    //public PRTriangle[] prTriangles;
     public int renderTriNum = 0;
     public List<PRVertex> prVertices;
     public List<PRTriangle> prTriangles;
@@ -62,9 +60,11 @@ public class ModelReduction{
             permutation[mn.id] = prVertices.Count - 1;
             collapse_map[prVertices.Count - 1] = (mn.collapse != null) ? mn.collapse.id : -1;
             Collapse(mn, mn.collapse);
+            if(mn.collapse != null)
+                Debug.Log((prVertices.Count - 1) + " " + mn.id+ " "+mn.collapse.id);
         }
 
-        for(int i = 0; i < collapse_map.Length; i++)
+        for(int i = 0; i < collapse_map.Length; i++) 
         {
             collapse_map[i] = (collapse_map[i] == -1) ? 0 : permutation[collapse_map[i]];
         }
@@ -100,7 +100,7 @@ public class ModelReduction{
         if (v.neighbor.Count == 0)
         {
             v.collapse = null;
-            v.cost = -0.01f;
+            v.cost = 100000f;
             return;
         }
         v.collapse = null;
@@ -173,6 +173,7 @@ public class ModelReduction{
     {
         if (v == null)
         {
+            u.DeleteVertex();
             prVertices.Remove(u);
             return;
         }
@@ -181,12 +182,12 @@ public class ModelReduction{
         {
             tmp.Add(u.neighbor[i]);
         }
-
         for (int i = u.face.Count - 1; i >= 0; i--)
         {
             if (u.face[i].HasVertex(v))
             {
-                u.face.Remove(u.face[i]);
+                prTriangles.Remove(u.face[i]);
+                u.face[i].DeleteFace();
             }
         }
 
@@ -195,6 +196,7 @@ public class ModelReduction{
             u.face[i].ReplaceVertex(u, v);
         }
 
+        u.DeleteVertex();
         prVertices.Remove(u);
 
         for (int i = 0; i < tmp.Count; i++)
@@ -208,7 +210,7 @@ public class ModelReduction{
         PRVertex vert = prVertices[0];
         for (int i = 0; i < prVertices.Count; i++)
         {
-            if (vert.cost > prVertices[i].cost)
+            if (prVertices[i].cost < vert.cost)
             {
                 vert = prVertices[i];
             }

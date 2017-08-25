@@ -31,13 +31,7 @@ public class PRTriangle
 
     public bool HasVertex(PRVertex v)
     {
-        if (vertex[0] == v)
-            return true;
-        if (vertex[1] == v)
-            return true;
-        if (vertex[2] == v)
-            return true;
-        return false;
+        return (v == vertex[0] || v == vertex[1] || v == vertex[2]);
     }
 
     public void ReplaceVertex(PRVertex u, PRVertex v)
@@ -69,10 +63,16 @@ public class PRTriangle
         {
             vertex[2] = v;
         }
-
+        else
+        {
+            Debug.Log("old vertex is not any of the tri verts.");
+        }
         u.RemoveFace(this);
         v.AddFace(this);
-
+        if (!v.face.Contains(this))
+        {
+            Debug.Log("v is not contain this face.");
+        }
         for(int i = 0; i < 3; i++)
         {
             u.RemoveIfNonNeighbor(vertex[i]);
@@ -81,7 +81,7 @@ public class PRTriangle
 
         for (int i = 0; i < 3; i++)
         {
-            for(int j = 0; j < 3; j++)
+            for (int j = 0; j < 3; j++)
             {
                 if(i != j)
                 {
@@ -93,6 +93,32 @@ public class PRTriangle
             }
         }
         ComputeNormal();
+    }
+
+    public void DeleteFace()
+    {
+        for (int i = 0; i < 3; i++)
+        {
+            if (vertex[i] != null)
+            {
+                if (!vertex[i].face.Contains(this))
+                {
+                    Debug.Log("cur vertex has no such face.");
+                }
+                vertex[i].face.Remove(this);
+            }
+        }
+
+        for (int i = 0; i < 3; i++)
+        {
+            int i2 = (i + 1) % 3;
+            if (vertex[i] == null || vertex[i2] == null)
+            {
+                continue;
+            }
+            vertex[i].RemoveIfNonNeighbor(vertex[i2]);
+            vertex[i2].RemoveIfNonNeighbor(vertex[i]);
+        }
     }
 }
 
